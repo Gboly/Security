@@ -1,0 +1,80 @@
+<%- include('partials/header') %>
+
+<div class="container mt-5">
+  <h1>Login</h1>
+
+  <div class="row">
+    <div class="col-sm-8">
+      <div class="card">
+        <div class="card-body">
+
+          <!-- Makes POST request to /login route -->
+          <form id="ajax-form" method="POST">
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input id="Email-input" type="email" class="form-control" name="username" required>
+            </div>
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input id="password-input" type="password" class="form-control" name="password" required>
+            </div>
+            <p id="wrong"></p>
+            <button type="submit" class="btn btn-dark">Login</button>
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- <div class="col-sm-4">
+      <div class="card">
+        <div class="card-body">
+          <a class="btn btn-block" href="/auth/google" role="button">
+            <i class="fab fa-google"></i>
+            Sign In with Google
+          </a>
+        </div>
+      </div>
+    </div> -->
+
+  </div>
+</div>
+
+
+<script>
+
+$(document).ready( function () {
+    $("#ajax-form").on("submit",async function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+        let emailValue=$("#Email-input").val();
+        let passwordValue=$("#password-input").val();
+
+        
+
+      $.ajax({
+           url: "/login",
+           type: "POST",
+           contentType: "application/json",
+           data: JSON.stringify({
+               user: emailValue,
+               pass: passwordValue,
+           }),
+           success:function(result){
+              if(result==="wrong"){
+                   $("#wrong").text("Email or Password is incorrect. Try again")
+              }
+              else{
+                  window.location.replace("http://localhost:3000/secrets/user/"+result.userResponse);
+              }
+           }          
+           
+       })
+
+    })
+})    
+
+</script>
+
+
+<%- include('partials/footer') %>
