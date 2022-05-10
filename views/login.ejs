@@ -9,7 +9,7 @@
         <div class="card-body">
 
           <!-- Makes POST request to /login route -->
-          <form id="ajax-form" method="POST">
+          <form id="ajax-form" method="POST" action="/login">
             <div class="form-group">
               <label for="email">Email</label>
               <input id="Email-input" type="email" class="form-control" name="username" required>
@@ -43,6 +43,12 @@
 
 <script>
 
+//const urlParams = new URLSearchParams(window.location.search);
+//    const info = urlParams.get('info');
+//    console.log(info);
+//    if(info){ $("#wrong").text(info) };
+
+
 $(document).ready( function () {
     $("#ajax-form").on("submit",async function (e) {
     e.preventDefault();
@@ -57,15 +63,17 @@ $(document).ready( function () {
            type: "POST",
            contentType: "application/json",
            data: JSON.stringify({
-               user: emailValue,
-               pass: passwordValue,
+               username: emailValue,
+               password: passwordValue,
            }),
            success:function(result){
               if(result==="wrong"){
                    $("#wrong").text("Email or Password is incorrect. Try again")
+                   $("#Email-input").val("")
+                   $("#password-input").val("")
               }
               else{
-                  window.location.replace("http://localhost:3000/secrets/user/"+result.userResponse);
+                  window.location.replace("http://localhost:3000/secrets");
               }
            }          
            
