@@ -11,6 +11,9 @@ const session = require('express-session');
 const passport = require("passport");
 const passportLocalMongoose = require('passport-local-mongoose');
 const flash = require("connect-flash");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const FacebookStrategy = require("passport-facebook").Strategy;
+const findOrCreate = require('mongoose-findorcreate');
 
 
 const app = express();
@@ -42,7 +45,9 @@ run().catch(console.dir);
 
 const userSchema = new mongoose.Schema({
     username: String,
-    password: String
+    password: String,
+    googleId: String,
+    facebookId: String
 })
 
 //const Options = {
@@ -50,13 +55,49 @@ const userSchema = new mongoose.Schema({
 //};
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 //userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields: [process.env.ENCRYPT] })
 
 const User=mongoose.model("User",userSchema)
 
 passport.use(User.createStrategy());
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets",
+    passReqToCallback: true,
+},
+    function (request, accessToken, refreshToken, profile, done) {          
+        
+        User.findOrCreate({ googleId: profile.id, username: profile.emails[0].value }, function (err, user) {
+            return done(err, user);
+        });
+    }
+));
+passport.use(new FacebookStrategy({
+    clientID: process.env.CLIENT_FB_ID,
+    clientSecret: process.env.CLIENT_FB_SECRET,
+    callbackURL: "http://localhost:3000/auth/facebook/secrets",
+    profileFields: ['id', 'displayName', 'photos', 'email'],
+    passReqToCallback: true,
+},
+    function (request, accessToken, refreshToken, profile, done) {
+
+
+        User.findOrCreate({ facebookId: profile.id, username: profile.emails[0].value }, function (err, user) {
+            return done(err, user);
+        });
+    }
+));
+
+passport.serializeUser((user, done) => {
+    return done(null, user.id);
+});
+passport.deserializeUser((id, done) => {
+    User.findById(id, (err, user) => {
+        return done(err, user);
+    })
+});
 
 //let pass = [];
 
@@ -72,7 +113,9 @@ app.get("/login", (req, res) => {
     res.render("login")
 })
 
-//In my quest to render a secrets page when the client's infos are correct, i formulated this url logic. This way, i can make ajax perform an operation just like res.redirect.
+app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"], prompt: "select_account" }))
+app.get('/auth/facebook', passport.authenticate('facebook', { scope: ["email"], authType:"reauthenticate" }));
+
 app.get("/secrets", async (req, res) => {
     //const userName = req.params.name;
     //const userPass = pass[pass.length - 1]
@@ -92,14 +135,34 @@ app.get("/secrets", async (req, res) => {
         'Cache-Control',
         'no-cache, private, no-store, must-revalidate, max-stal e=0, post-check=0, pre-check=0'
     );
-    console.log("It got here")
+    const Person = req.user;
+    
     if (req.isAuthenticated()) {
-        console.log(req.isAuthenticated());
-        res.render("secrets");
+        const Name = Person.username;
+        const Google = req.user.googleId
+        const Facebook = req.user.facebookId;
+        if (!Google) {
+            if (!Facebook) {
+                return res.render("secrets", { Name: Name + " signed in to secrets locally" })
+            }
+            else {
+                return res.render("secrets", { Name: Name + " signed in to secrets through facebook" })
+            }           
+        }
+        else { res.render("secrets", { Name: Name + " signed in to secrets through google" })}
+        
     }
     else {        
         res.redirect("/login");
     }
+})
+
+app.get("/auth/google/secrets", passport.authenticate("google", { failureRedirect: "/login" }), (req, res) => {    
+       res.redirect("/secrets");
+})
+
+app.get("/auth/facebook/secrets", passport.authenticate("facebook", { failureRedirect: "/login" }), (req, res) => {
+    res.redirect("/secrets");
 })
 
 app.get("/logout", (req, res) => {
@@ -126,8 +189,7 @@ app.post("/register", (req, res) => {
             console.log(err);
         }
         else {
-            passport.authenticate("local")(req, res, function () {
-                console.log(user);
+            passport.authenticate("local")(req, res, function () {                
                 res.redirect("/secrets")
             })
         }
